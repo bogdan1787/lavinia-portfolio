@@ -41,6 +41,9 @@ jobs:
       - name: Generate manifest & sitemap
         run: python generate-manifest.py
 
+      - name: Validate output
+        run: python validate.py
+
       - name: Commit changes
         run: |
           git config user.name  "github-actions[bot]"
