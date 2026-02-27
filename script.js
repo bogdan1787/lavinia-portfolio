@@ -1,29 +1,33 @@
 /**
  * script.js — Portfolio gallery logic
- *
- * ┌─ Quick configuration ──────────────────────────────────────────────────┐
- * │  Open index.html and edit the <h1> and <p> tags in the <header>       │
- * │  to change the artist name and tagline.                                │
- * └────────────────────────────────────────────────────────────────────────┘
  */
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const BATCH_SIZE = 24;  // images rendered per scroll batch
 
 // ── State ────────────────────────────────────────────────────────────────────
 
-let allImages    = [];   // flat list: { file, alt, category (slug) }
-let filteredImages = []; // current view
-let lightboxIndex  = 0;  // index in filteredImages
+let allImages      = [];   // full flat list with all metadata
+let filteredImages = [];   // full current-view list (used by lightbox)
+let renderQueue    = [];   // [{type:'heading'|'image', ...}] for current view
+let renderedCount  = 0;    // how many renderQueue items are in the DOM
+let scrollObserver = null;
+let lightboxIndex  = 0;
+let currentCategories = [];
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
-const gallery    = document.getElementById('gallery');
+const gallery     = document.getElementById('gallery');
 const catNavInner = document.querySelector('.cat-nav-inner');
-const emptyState = document.getElementById('emptyState');
-const lightbox   = document.getElementById('lightbox');
-const lbImg      = document.getElementById('lbImg');
-const lbCaption  = document.getElementById('lbCaption');
-const lbClose    = document.getElementById('lbClose');
-const lbPrev     = document.getElementById('lbPrev');
-const lbNext     = document.getElementById('lbNext');
+const emptyState  = document.getElementById('emptyState');
+const lightbox    = document.getElementById('lightbox');
+const lbImg       = document.getElementById('lbImg');
+const lbCaption   = document.getElementById('lbCaption');
+const lbClose     = document.getElementById('lbClose');
+const lbPrev      = document.getElementById('lbPrev');
+const lbNext      = document.getElementById('lbNext');
+const sentinel    = document.getElementById('scroll-sentinel');
 
 // ── Load manifest ─────────────────────────────────────────────────────────────
 
@@ -47,11 +51,20 @@ function buildGallery(categories) {
     return;
   }
 
-  // Flatten all images with category metadata
+  // Flatten all images with full metadata
   allImages = [];
   categories.forEach(cat => {
     cat.images.forEach(img => {
-      allImages.push({ file: img.file, alt: img.alt, category: cat.slug, categoryName: cat.name });
+      allImages.push({
+        file        : img.file,
+        thumb       : img.thumb || img.file,  // fallback to full if no thumb yet
+        alt         : img.alt,
+        w           : img.w   || null,
+        h           : img.h   || null,
+        added       : img.added || null,
+        category    : cat.slug,
+        categoryName: cat.name,
+      });
     });
   });
 
@@ -64,51 +77,96 @@ function buildGallery(categories) {
     catNavInner.appendChild(btn);
   });
 
-  // Default: show all
   showCategory('all', categories);
 }
 
-function showCategory(slug, categories) {
-  gallery.innerHTML = '';
+// ── Render queue + infinite scroll ───────────────────────────────────────────
+
+function buildRenderQueue(slug, categories) {
+  filteredImages = [];
+  renderQueue    = [];
 
   if (slug === 'all') {
-    // Group by category with headings
-    filteredImages = [];
     categories.forEach(cat => {
       if (!cat.images.length) return;
-
-      const heading = document.createElement('div');
-      heading.className = 'category-heading';
-      heading.innerHTML = `<h2>${cat.name}</h2>`;
-      gallery.appendChild(heading);
-
+      renderQueue.push({ type: 'heading', name: cat.name });
       cat.images.forEach(img => {
-        const idx = filteredImages.length;
-        filteredImages.push({ file: img.file, alt: img.alt, category: cat.slug, categoryName: cat.name });
-        gallery.appendChild(makeItem(img, idx));
+        const idx  = filteredImages.length;
+        const item = {
+          file: img.file, thumb: img.thumb || img.file,
+          alt: img.alt, w: img.w || null, h: img.h || null,
+          added: img.added || null,
+          category: cat.slug, categoryName: cat.name,
+        };
+        filteredImages.push(item);
+        renderQueue.push({ type: 'image', img: item, idx });
       });
     });
   } else {
     filteredImages = allImages.filter(img => img.category === slug);
-    filteredImages.forEach((img, idx) => gallery.appendChild(makeItem(img, idx)));
+    filteredImages.forEach((img, idx) => renderQueue.push({ type: 'image', img, idx }));
   }
 }
 
-function makeItem(img, idx) {
+function renderNextBatch() {
+  const start = renderedCount;
+  const end   = Math.min(start + BATCH_SIZE, renderQueue.length);
+
+  for (let i = start; i < end; i++) {
+    const item     = renderQueue[i];
+    const batchPos = i - start;
+    if (item.type === 'heading') {
+      const h = document.createElement('div');
+      h.className = 'category-heading';
+      h.innerHTML = `<h2>${item.name}</h2>`;
+      gallery.appendChild(h);
+    } else {
+      gallery.appendChild(makeItem(item.img, item.idx, batchPos));
+    }
+  }
+  renderedCount = end;
+
+  // Show/hide sentinel and (re)connect observer
+  if (renderedCount < renderQueue.length) {
+    sentinel.classList.remove('hidden');
+    if (!scrollObserver) {
+      scrollObserver = new IntersectionObserver(
+        entries => { if (entries[0].isIntersecting) renderNextBatch(); },
+        { rootMargin: '300px' }
+      );
+      scrollObserver.observe(sentinel);
+    }
+  } else {
+    sentinel.classList.add('hidden');
+    if (scrollObserver) { scrollObserver.disconnect(); scrollObserver = null; }
+  }
+}
+
+function showCategory(slug, categories) {
+  gallery.innerHTML = '';
+  renderedCount = 0;
+  if (scrollObserver) { scrollObserver.disconnect(); scrollObserver = null; }
+  buildRenderQueue(slug, categories);
+  renderNextBatch();
+}
+
+function makeItem(img, idx, batchPos = 0) {
   const div = document.createElement('div');
   div.className = 'gallery-item';
   div.setAttribute('role', 'button');
   div.setAttribute('tabindex', '0');
   div.setAttribute('aria-label', img.alt || img.file);
   div.dataset.index = idx;
-  div.style.animationDelay = `${Math.min(idx, 20) * 0.05}s`;
+  div.style.animationDelay = `${Math.min(batchPos, 12) * 0.04}s`;
 
   const image = document.createElement('img');
-  image.src      = img.file;
-  image.alt      = img.alt || '';
-  image.loading  = 'lazy';
-  image.decoding = 'async';
+  image.src       = img.thumb;   // ← small thumbnail for the grid
+  image.alt       = img.alt || '';
+  image.loading   = 'lazy';
+  image.decoding  = 'async';
   image.draggable = false;
+  // Pre-reserve exact space → prevents layout shift (CLS)
+  if (img.w && img.h) image.style.aspectRatio = `${img.w} / ${img.h}`;
 
   const caption = document.createElement('span');
   caption.className = 'item-caption';
@@ -119,7 +177,7 @@ function makeItem(img, idx) {
 
   // "New" badge — shown for 30 days after first upload
   if (img.added) {
-    const age = (Date.now() - new Date(img.added).getTime()) / (1000 * 60 * 60 * 24);
+    const age = (Date.now() - new Date(img.added).getTime()) / 86400000;
     if (age < 30) {
       const badge = document.createElement('span');
       badge.className = 'badge-new';
@@ -136,15 +194,11 @@ function makeItem(img, idx) {
 
 // ── Category filter ───────────────────────────────────────────────────────────
 
-let currentCategories = [];
-
 catNavInner.addEventListener('click', e => {
   const btn = e.target.closest('.cat-btn');
   if (!btn) return;
-
   catNavInner.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-
   showCategory(btn.dataset.slug, currentCategories);
 });
 
@@ -165,19 +219,18 @@ function closeLightbox() {
 
 function renderLightbox() {
   const img = filteredImages[lightboxIndex];
-  lbImg.src = img.file;
+  lbImg.src = img.file;   // ← full-size image in lightbox
   lbImg.alt = img.alt;
 
-  // Restart animation
   lbImg.style.animation = 'none';
-  lbImg.offsetHeight; // reflow
+  lbImg.offsetHeight;
   lbImg.style.animation = '';
 
   lbCaption.textContent = img.alt
     ? `${img.alt}  ·  ${img.categoryName}`
     : img.categoryName;
 
-  lbPrev.style.visibility = lightboxIndex > 0                      ? 'visible' : 'hidden';
+  lbPrev.style.visibility = lightboxIndex > 0                         ? 'visible' : 'hidden';
   lbNext.style.visibility = lightboxIndex < filteredImages.length - 1 ? 'visible' : 'hidden';
 }
 
@@ -193,20 +246,15 @@ lbClose.addEventListener('click', closeLightbox);
 lbPrev.addEventListener('click',  () => stepLightbox(-1));
 lbNext.addEventListener('click',  () => stepLightbox(+1));
 
-// Click backdrop to close
-lightbox.addEventListener('click', e => {
-  if (e.target === lightbox) closeLightbox();
-});
+lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
 
-// Keyboard navigation
 document.addEventListener('keydown', e => {
   if (lightbox.classList.contains('hidden')) return;
-  if (e.key === 'Escape')      closeLightbox();
-  if (e.key === 'ArrowLeft')   stepLightbox(-1);
-  if (e.key === 'ArrowRight')  stepLightbox(+1);
+  if (e.key === 'Escape')     closeLightbox();
+  if (e.key === 'ArrowLeft')  stepLightbox(-1);
+  if (e.key === 'ArrowRight') stepLightbox(+1);
 });
 
-// Touch swipe support (lightbox)
 let touchStartX = 0;
 lightbox.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
 lightbox.addEventListener('touchend',   e => {
@@ -216,20 +264,14 @@ lightbox.addEventListener('touchend',   e => {
 
 // ── Image protection ─────────────────────────────────────────────────────────
 
-// Disable right-click save on images
-document.addEventListener('contextmenu', e => {
-  if (e.target.tagName === 'IMG') e.preventDefault();
-});
-
-// Disable drag-to-desktop
-document.addEventListener('dragstart', e => {
-  if (e.target.tagName === 'IMG') e.preventDefault();
-});
+document.addEventListener('contextmenu', e => { if (e.target.tagName === 'IMG') e.preventDefault(); });
+document.addEventListener('dragstart',   e => { if (e.target.tagName === 'IMG') e.preventDefault(); });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 (async () => {
-  const categories = await loadManifest();
+  const categories  = await loadManifest();
   currentCategories = categories;
   buildGallery(categories);
 })();
+

@@ -36,7 +36,8 @@ HASHES_FILE   = Path(__file__).parent / "image-hashes.json"
 FONT_DIR      = Path(__file__).parent / "fonts"
 
 WATERMARK_TEXT = "© Lavinia Gabriela Enache"
-MAX_PX         = 2400    # max width or height in pixels
+MAX_PX         = 2400    # max width or height for full images
+THUMB_PX       = 400     # max width or height for grid thumbnails
 JPEG_Q         = 85      # JPEG / WebP quality
 
 # Font search order — first found wins
@@ -111,7 +112,8 @@ def apply_watermark(img: Image.Image) -> Image.Image:
     return Image.alpha_composite(rgba, layer)
 
 
-def save_image(result: Image.Image, path: Path, original_mode: str):
+def save_image(result: Image.Image, path: Path):
+    """Save RGBA result to path in its native format."""
     fmt = path.suffix.lower()
     if fmt in {".jpg", ".jpeg"}:
         rgb = Image.new("RGB", result.size, (255, 255, 255))
@@ -121,6 +123,18 @@ def save_image(result: Image.Image, path: Path, original_mode: str):
         result.save(path, "PNG", optimize=True)
     elif fmt == ".webp":
         result.save(path, "WEBP", quality=JPEG_Q, method=6)
+
+
+def generate_thumb(rgba_img: Image.Image, original_path: Path) -> Path:
+    """Save a small thumbnail (no watermark) and return its path."""
+    thumb_dir = original_path.parent / "thumbs"
+    thumb_dir.mkdir(exist_ok=True)
+    thumb_path = thumb_dir / original_path.name
+
+    thumb = rgba_img.copy()
+    thumb.thumbnail((THUMB_PX, THUMB_PX), Image.LANCZOS)
+    save_image(thumb, thumb_path)
+    return thumb_path
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -139,13 +153,19 @@ changed = 0
 skipped = 0
 
 for img_path in sorted(IMAGES_DIR.rglob("*")):
+    # Skip thumbnails (they live in thumbs/ subdirs and are auto-generated)
+    if "thumbs" in img_path.parts:
+        continue
     if img_path.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
         continue
 
     key          = img_path.relative_to(IMAGES_DIR.parent).as_posix()
     current_hash = sha256(img_path)
 
-    if hashes.get(key) == current_hash:
+    # Support both old (string) and new (dict) hash format
+    stored = hashes.get(key)
+    stored_hash = stored if isinstance(stored, str) else (stored or {}).get("hash")
+    if stored_hash == current_hash:
         skipped += 1
         continue  # already processed — never re-compress or re-watermark
 
@@ -153,30 +173,31 @@ for img_path in sorted(IMAGES_DIR.rglob("*")):
 
     try:
         with Image.open(img_path) as img:
-            original_mode = img.mode
             w, h = img.size
-
             if max(w, h) > MAX_PX:
                 img.thumbnail((MAX_PX, MAX_PX), Image.LANCZOS)
+            final_w, final_h = img.size
 
             result = apply_watermark(img)
 
-        save_image(result, img_path, original_mode)
+        save_image(result, img_path)
+        generate_thumb(result, img_path)   # 400px thumbnail, no watermark
 
-        new_size      = img_path.stat().st_size
-        saving        = round((1 - new_size / orig_size) * 100) if orig_size else 0
-        hashes[key]   = sha256(img_path)   # hash of final watermarked file
+        new_size    = img_path.stat().st_size
+        saving      = round((1 - new_size / orig_size) * 100) if orig_size else 0
+        hashes[key] = {"hash": sha256(img_path), "w": final_w, "h": final_h}
         print(f"  ✓  {key}  {orig_size // 1024} KB → {new_size // 1024} KB  (−{saving}%)")
         changed += 1
 
     except Exception as e:
         print(f"  ⚠  {img_path.name}: {e}")
 
-# Prune stale hashes for deleted images, then persist
+# Prune stale hashes for deleted images (exclude thumbs from live_keys)
 live_keys = {
     img_path.relative_to(IMAGES_DIR.parent).as_posix()
     for img_path in IMAGES_DIR.rglob("*")
-    if img_path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
+    if "thumbs" not in img_path.parts
+    and img_path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
 }
 pruned = {k for k in hashes if k not in live_keys}
 if pruned:
