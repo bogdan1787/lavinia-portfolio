@@ -172,7 +172,17 @@ for img_path in sorted(IMAGES_DIR.rglob("*")):
     except Exception as e:
         print(f"  ⚠  {img_path.name}: {e}")
 
-# Persist updated hashes
+# Prune stale hashes for deleted images, then persist
+live_keys = {
+    img_path.relative_to(IMAGES_DIR.parent).as_posix()
+    for img_path in IMAGES_DIR.rglob("*")
+    if img_path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
+}
+pruned = {k for k in hashes if k not in live_keys}
+if pruned:
+    hashes = {k: v for k, v in hashes.items() if k in live_keys}
+    print(f"  Pruned {len(pruned)} stale hash entr{'ies' if len(pruned) != 1 else 'y'}.")
+
 HASHES_FILE.write_text(json.dumps(hashes, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 if changed:

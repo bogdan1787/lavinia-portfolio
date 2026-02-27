@@ -119,6 +119,10 @@ for cat in categories:
             dates[img["file"]] = old_date if first_run else today
         img["added"] = dates[img["file"]]
 
+# Prune stale entries for deleted images
+live_files = {img["file"] for cat in categories for img in cat["images"]}
+dates      = {k: v for k, v in dates.items() if k in live_files}
+
 DATES_FILE.write_text(json.dumps(dates, indent=2) + "\n", encoding="utf-8")
 
 # Re-write manifest now that images have "added" dates
