@@ -30,8 +30,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Pillow
-        run: pip install Pillow --quiet
+      - name: Install Pillow and fonts
+        run: |
+          pip install Pillow --quiet
+          sudo apt-get install -y fonts-urw-base35
 
       - name: Optimize images
         run: python optimize-images.py

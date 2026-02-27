@@ -19,7 +19,6 @@ entry from image-hashes.json or delete the file entirely.
 
 import hashlib
 import json
-import urllib.request
 from pathlib import Path
 
 try:
@@ -35,13 +34,22 @@ except ImportError:
 IMAGES_DIR    = Path(__file__).parent / "images"
 HASHES_FILE   = Path(__file__).parent / "image-hashes.json"
 FONT_DIR      = Path(__file__).parent / "fonts"
-FONT_PATH     = FONT_DIR / "PlayfairDisplay-Italic.ttf"
-FONT_URL      = ("https://raw.githubusercontent.com/google/fonts/main"
-                 "/ofl/playfairdisplay/static/PlayfairDisplay-Italic.ttf")
 
 WATERMARK_TEXT = "© Lavinia Gabriela Enache"
 MAX_PX         = 2400    # max width or height in pixels
 JPEG_Q         = 85      # JPEG / WebP quality
+
+# Font search order — first found wins
+# The Action installs fonts-urw-base35 (URW Palladio = Palatino-class serif)
+FONT_CANDIDATES = [
+    FONT_DIR / "PlayfairDisplay-Italic.ttf",                                    # bundled
+    Path("/usr/share/fonts/opentype/urw-base35/URWPalladio-Ita.otf"),           # Ubuntu (Action)
+    Path("/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf"),    # Ubuntu fallback
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf"),            # Ubuntu fallback
+    Path("C:/Windows/Fonts/georgiai.ttf"),                                      # Windows (Georgia Italic)
+    Path("C:/Windows/Fonts/timesi.ttf"),                                        # Windows (Times Italic)
+    Path("/System/Library/Fonts/Supplemental/Georgia Italic.ttf"),              # macOS
+]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -52,21 +60,22 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def ensure_font():
-    """Download Playfair Display Italic if not already cached."""
-    if FONT_PATH.exists():
-        return
-    FONT_DIR.mkdir(exist_ok=True)
-    print(f"  Downloading font → {FONT_PATH.name}…")
-    urllib.request.urlretrieve(FONT_URL, FONT_PATH)
-    print(f"  ✓ Font cached at {FONT_PATH}")
+def find_font() -> Path | None:
+    """Return the first available font path from FONT_CANDIDATES."""
+    for p in FONT_CANDIDATES:
+        if p.exists():
+            return p
+    return None
 
 
 def get_font(size: int) -> ImageFont.FreeTypeFont:
-    try:
-        return ImageFont.truetype(str(FONT_PATH), size)
-    except Exception:
-        return ImageFont.load_default()
+    path = find_font()
+    if path:
+        try:
+            return ImageFont.truetype(str(path), size)
+        except Exception:
+            pass
+    return ImageFont.load_default()
 
 
 def apply_watermark(img: Image.Image) -> Image.Image:
@@ -116,7 +125,8 @@ def save_image(result: Image.Image, path: Path, original_mode: str):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-ensure_font()
+used_font = find_font()
+print(f"  Font: {used_font or 'PIL default (no system font found)'}")
 
 hashes: dict = {}
 if HASHES_FILE.exists():
