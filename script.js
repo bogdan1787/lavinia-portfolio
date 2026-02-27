@@ -6,6 +6,19 @@
 
 const BATCH_SIZE = 24;  // images rendered per scroll batch
 
+// ── Theme ─────────────────────────────────────────────────────────────────────
+
+const THEME_KEY = 'lgfe-theme';
+
+const ICON_SUN  = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+const ICON_MOON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  themeToggle.innerHTML = theme === 'dark' ? ICON_SUN : ICON_MOON;
+  themeToggle.title     = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 
 let allImages      = [];   // full flat list with all metadata
@@ -18,16 +31,47 @@ let currentCategories = [];
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
-const gallery     = document.getElementById('gallery');
-const catNavInner = document.querySelector('.cat-nav-inner');
-const emptyState  = document.getElementById('emptyState');
-const lightbox    = document.getElementById('lightbox');
-const lbImg       = document.getElementById('lbImg');
-const lbCaption   = document.getElementById('lbCaption');
-const lbClose     = document.getElementById('lbClose');
-const lbPrev      = document.getElementById('lbPrev');
-const lbNext      = document.getElementById('lbNext');
-const sentinel    = document.getElementById('scroll-sentinel');
+const gallery      = document.getElementById('gallery');
+const catNavInner  = document.querySelector('.cat-nav-inner');
+const catNavScroll = document.getElementById('catNavScroll');
+const navScrollLeft  = document.getElementById('navScrollLeft');
+const navScrollRight = document.getElementById('navScrollRight');
+const themeToggle  = document.getElementById('themeToggle');
+const emptyState   = document.getElementById('emptyState');
+const lightbox     = document.getElementById('lightbox');
+const lbImg        = document.getElementById('lbImg');
+const lbCaption    = document.getElementById('lbCaption');
+const lbClose      = document.getElementById('lbClose');
+const lbPrev       = document.getElementById('lbPrev');
+const lbNext       = document.getElementById('lbNext');
+const sentinel     = document.getElementById('scroll-sentinel');
+
+// ── Theme init ────────────────────────────────────────────────────────────────
+
+applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+
+themeToggle.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+});
+
+// ── Nav scroll hints ──────────────────────────────────────────────────────────
+
+function updateNavScroll() {
+  const el      = catNavInner;
+  const atLeft  = el.scrollLeft <= 1;
+  const atRight = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+  navScrollLeft.classList.toggle('hidden',  atLeft);
+  navScrollRight.classList.toggle('hidden', atRight);
+  catNavScroll.classList.toggle('can-scroll-left',  !atLeft);
+  catNavScroll.classList.toggle('can-scroll-right', !atRight);
+}
+
+navScrollLeft.addEventListener('click',  () => catNavInner.scrollBy({ left: -150, behavior: 'smooth' }));
+navScrollRight.addEventListener('click', () => catNavInner.scrollBy({ left:  150, behavior: 'smooth' }));
+catNavInner.addEventListener('scroll', updateNavScroll, { passive: true });
+window.addEventListener('resize',       updateNavScroll, { passive: true });
 
 // ── Load manifest ─────────────────────────────────────────────────────────────
 
@@ -78,6 +122,15 @@ function buildGallery(categories) {
   });
 
   showCategory('all', categories);
+
+  // Initialise nav scroll hints + pulse the right arrow once if overflow exists
+  requestAnimationFrame(() => {
+    updateNavScroll();
+    if (!navScrollRight.classList.contains('hidden')) {
+      navScrollRight.classList.add('hint');
+      navScrollRight.addEventListener('animationend', () => navScrollRight.classList.remove('hint'), { once: true });
+    }
+  });
 }
 
 // ── Render queue + infinite scroll ───────────────────────────────────────────
