@@ -7,6 +7,9 @@
         {
           "file": "images/abstract/abstract.jpg",
           "alt": "abstract",
+          "w": 2400,
+          "h": 1600,
+          "thumb": "images/abstract/thumbs/abstract.jpg",
           "added": "2020-01-01"
         }
       ]
@@ -18,6 +21,9 @@
         {
           "file": "images/landscapes/lake.jpg",
           "alt": "lake",
+          "w": 2400,
+          "h": 1506,
+          "thumb": "images/landscapes/thumbs/lake.jpg",
           "added": "2020-01-01"
         }
       ]
@@ -29,11 +35,17 @@
         {
           "file": "images/portraits/tree 2.jpg",
           "alt": "tree 2",
+          "w": 1200,
+          "h": 1200,
+          "thumb": "images/portraits/thumbs/tree 2.jpg",
           "added": "2020-01-01"
         },
         {
           "file": "images/portraits/tree.jpg",
           "alt": "tree",
+          "w": 1157,
+          "h": 1280,
+          "thumb": "images/portraits/thumbs/tree.jpg",
           "added": "2020-01-01"
         }
       ]
