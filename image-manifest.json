@@ -1,3 +1,34 @@
 {
-  "categories": []
+  "categories": [
+    {
+      "name": "Abstract",
+      "slug": "abstract",
+      "images": [
+        {
+          "file": "images/abstract/lake.jpg",
+          "alt": "lake"
+        }
+      ]
+    },
+    {
+      "name": "Landscapes",
+      "slug": "landscapes",
+      "images": [
+        {
+          "file": "images/landscapes/lake.jpg",
+          "alt": "lake"
+        }
+      ]
+    },
+    {
+      "name": "Portraits",
+      "slug": "portraits",
+      "images": [
+        {
+          "file": "images/portraits/lake.jpg",
+          "alt": "lake"
+        }
+      ]
+    }
+  ]
 }
