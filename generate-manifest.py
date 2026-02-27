@@ -33,7 +33,7 @@ OG_PREVIEW   = Path(__file__).parent / "og-preview.jpg"
 SUPPORTED    = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg"}
 
 # Update this when you add a custom domain
-SITE_URL = "https://bogdan1787.github.io/lavinia-portfolio"
+SITE_URL = "https://laviniaenache.com"
 
 # Matches a leading numeric prefix like "01-", "02_", "003 " etc.
 ORDER_PREFIX = re.compile(r"^(\d+)[_\-\s]*")
