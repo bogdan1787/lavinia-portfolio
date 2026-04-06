@@ -47,7 +47,7 @@
   --surface: #f0ede8;
   --border:  #ddd9d2;
   --text:    #1a1714;
-  --muted:   #7a7470;
+  --muted:   #646260;
   --accent:  #b5843a;
   --nav-bg:  rgba(250,248,245,.92);
 }
@@ -490,7 +490,6 @@ body {
 
 .footer-note {
   font-size: .72rem !important;
-  opacity: .6;
 }
 
 /* ── Infinite scroll sentinel ────────────────────────────────────────────── */
