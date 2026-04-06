@@ -326,7 +326,6 @@ function renderLightbox() {
     lbImg.classList.add('hidden');
     lbVideo.classList.remove('hidden');
     lbVideo.src = img.file;
-    lbVideo.load();
     const p = lbVideo.play();
     if (p) p.catch(() => {});
     // Reset entry animation

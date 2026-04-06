@@ -343,8 +343,13 @@ body {
 
 /* Category section headings (visible in "All" view) */
 .category-heading {
-  break-inside: avoid;
+  column-span: all;
+  margin-top: calc(var(--gap) * 2);
   margin-bottom: var(--gap);
+}
+
+.gallery > .category-heading:first-child {
+  margin-top: 0;
 }
 
 .category-heading h2 {
