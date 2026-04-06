@@ -23,7 +23,7 @@ python validate.py
 
 `validate.py` exits with code 1 on errors — it is the CI gate. No other test runner exists.
 
-**Preferred workflow for publishing:** use the `publish_gallery` tool (Copilot CLI skill — see below). It handles git sync, all Python steps, commit, and push in one call.
+**Preferred workflow for publishing:** use the `update_website` tool (Copilot CLI skill — see below). It handles git sync, commit, and push in one call — CI does the rest.
 
 ## Architecture
 
@@ -84,10 +84,10 @@ image-dates.json            ← first-seen date per image (drives "New" badge)
 ### validate.py checks
 Per-image: `file`, `alt`, `added` fields present; file exists on disk and is non-empty; `file` and `thumb` paths start with `images/`; `animated: true` only on `.gif`/`.webp`; `w`/`h` are positive non-boolean integers; declared `thumb` path exists on disk. Global: OG preview has `FF D8` JPEG magic bytes; sitemap is valid XML with `<url>` entries.
 
-### Copilot CLI skill — `publish_gallery`
-`.github/extensions/update-gallery/extension.mjs` registers a `publish_gallery` tool available in any Copilot CLI session for this repo. When the artist says "publish" or "update the website", call this tool — it runs the full pipeline (git pull --rebase --autostash → optimize → generate → validate → commit → push) without requiring any git knowledge. Merge conflicts are surfaced with a plain-English recovery message.
+### Copilot CLI skill — `update_website`
+`.github/extensions/update-gallery/extension.mjs` registers an `update_website` tool available in any Copilot CLI session for this repo. When the artist says "publish" or "update the website", call this tool — it runs git pull --rebase --autostash, commits any pending changes, and pushes. CI (GitHub Actions) then handles image optimisation, manifest generation, validation, and deployment automatically. Merge conflicts are surfaced with a plain-English recovery message.
 
 ### Adding new images
 1. Drop images into `images/<category>/` (create the subfolder if needed). Supported formats: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.avif`, `.svg`.
-2. Say "publish the gallery" (Copilot CLI will use the skill) **or** run `python optimize-images.py && python generate-manifest.py` locally **or** just push — CI runs automatically.
+2. Say "update the website" (Copilot CLI will use the skill) **or** run `python optimize-images.py && python generate-manifest.py` locally **or** just push — CI runs automatically.
 3. Never manually edit `image-manifest.json`, `image-hashes.json`, or `image-dates.json`; they are always machine-generated.

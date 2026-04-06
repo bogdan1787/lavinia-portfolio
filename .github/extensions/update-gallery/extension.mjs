@@ -59,9 +59,9 @@ const session = await joinSession({
 
     tools: [
         {
-            name: "publish_gallery",
+            name: "update_website",
             description:
-                "Publish Lavinia's portfolio to GitHub Pages in one step. " +
+                "Update Lavinia's portfolio website on GitHub Pages in one step. " +
                 "Syncs with GitHub (pull/rebase), commits any pending changes, " +
                 "and pushes. GitHub Actions then automatically optimises images " +
                 "(resize, watermark, thumbnail), regenerates the manifest, and deploys. " +
