@@ -131,9 +131,7 @@ def save_image(result: Image.Image, path: Path):
     elif fmt == ".webp":
         result.save(path, "WEBP", quality=JPEG_Q, method=6)
     elif fmt == ".gif":
-        # Quantize RGBA → palette, preserving transparency index (no RGB round-trip)
-        p = result.quantize(colors=255)
-        p.save(path, "GIF", transparency=p.info.get("transparency", 255))
+        rgba_to_palette(result).save(path, "GIF", transparency=255)
 
 
 def generate_thumb(rgba_img: Image.Image, original_path: Path) -> Path:
@@ -159,6 +157,32 @@ def is_animated(img: Image.Image) -> bool:
         return getattr(img, "n_frames", 1) > 1
     except Exception:
         return False
+
+
+def rgba_to_palette(img: Image.Image) -> Image.Image:
+    """Convert an RGBA image to palette (P) mode suitable for GIF output.
+
+    Pillow's quantize() silently drops the alpha channel on RGBA images,
+    so p.info["transparency"] is never set and any default is a guess.
+    This helper:
+      1. Composites RGB channels onto white so quantisation picks good colours.
+      2. Quantises to 255 colours (palette index 255 is left free).
+      3. Stamps pixels with alpha < 128 back to index 255.
+      4. Sets info["transparency"] = 255 so the GIF encoder writes it correctly.
+    """
+    if img.mode != "RGBA":
+        return img.convert("P")
+    alpha = img.split()[3]
+    bg = Image.new("RGB", img.size, (255, 255, 255))
+    bg.paste(img.convert("RGB"), mask=alpha)
+    p = bg.quantize(colors=255)
+    px = list(p.getdata())
+    for i, a_val in enumerate(alpha.getdata()):
+        if a_val < 128:
+            px[i] = 255
+    p.putdata(px)
+    p.info["transparency"] = 255
+    return p
 
 
 def process_animated(img_path: Path) -> tuple[int, int]:
@@ -205,9 +229,6 @@ def process_animated(img_path: Path) -> tuple[int, int]:
     # Watermark frame 0 only
     frames[0] = apply_watermark(frames[0])
 
-    # Generate static thumbnail from watermarked frame 0 (uses in-memory frame)
-    generate_thumb(frames[0].copy(), img_path)
-
     # Re-save all frames back to the original file — write atomically via temp file
     loop = info.get("loop", 0)
 
@@ -218,8 +239,8 @@ def process_animated(img_path: Path) -> tuple[int, int]:
 
     try:
         if fmt == ".gif":
-            # Quantize RGBA → palette per frame, preserving transparency index
-            p_frames = [f.quantize(colors=255) for f in frames]
+            # rgba_to_palette() preserves transparency correctly (quantize() drops alpha)
+            p_frames = [rgba_to_palette(f) for f in frames]
             p_frames[0].save(
                 tmp_path, format="GIF", save_all=True,
                 append_images=p_frames[1:],
@@ -227,7 +248,7 @@ def process_animated(img_path: Path) -> tuple[int, int]:
                 duration=durations,
                 disposal=disposals,
                 optimize=False,
-                transparency=p_frames[0].info.get("transparency", 255),
+                transparency=255,
             )
         else:
             # Animated WebP
@@ -243,6 +264,9 @@ def process_animated(img_path: Path) -> tuple[int, int]:
     except Exception:
         tmp_path.unlink(missing_ok=True)
         raise
+
+    # Thumbnail written after main file is committed to disk
+    generate_thumb(frames[0].copy(), img_path)
 
     return final_w, final_h
 
@@ -302,8 +326,8 @@ for img_path in sorted(IMAGES_DIR.rglob("*")):
                 tmp_path = Path(tmp.name)
             try:
                 save_image(result, tmp_path)
-                generate_thumb(result, img_path)
                 tmp_path.replace(img_path)
+                generate_thumb(result, img_path)
             except Exception:
                 tmp_path.unlink(missing_ok=True)
                 raise
