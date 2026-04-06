@@ -1,22 +1,13 @@
 {
-  "images/abstract/abstract.jpg": {
-    "h": 1600,
-    "hash": "1c62c8f481f37b843dbc8b1e08d9e93c19b4bd7447656f88873d6ac09f369ea2",
-    "w": 2400
+  "images/animations/Unnamed.mp4": {
+    "h": 1080,
+    "hash": "e727d03a24d86db76e835acfc74cd62b288f1f9ed717a0284be308f21791d538",
+    "video": true,
+    "w": 1700
   },
   "images/awesome/lake.jpg": {
     "h": 1506,
     "hash": "4de1f2d3cffed108696ef3bae81a03e79496e3c4a9d33e1644fa60b670cb46e4",
     "w": 2400
-  },
-  "images/portraits/tree 2.jpg": {
-    "h": 1200,
-    "hash": "f324ef52b9532e817cd4db59ec39b0fb60c4da1a7cd047eb4fe7efcd2a68059e",
-    "w": 1200
-  },
-  "images/portraits/tree.jpg": {
-    "h": 1280,
-    "hash": "bf656e595e1f3b5404edc332217af03b3962f611c72b9792f24608601e9abbff",
-    "w": 1157
   }
 }

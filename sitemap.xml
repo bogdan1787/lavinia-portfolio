@@ -4,20 +4,8 @@
   <url>
     <loc>https://laviniaenache.com/</loc>
     <image:image>
-      <image:loc>https://laviniaenache.com/images/abstract/abstract.jpg</image:loc>
-      <image:title>abstract</image:title>
-    </image:image>
-    <image:image>
       <image:loc>https://laviniaenache.com/images/awesome/lake.jpg</image:loc>
       <image:title>lake</image:title>
-    </image:image>
-    <image:image>
-      <image:loc>https://laviniaenache.com/images/portraits/tree%202.jpg</image:loc>
-      <image:title>tree 2</image:title>
-    </image:image>
-    <image:image>
-      <image:loc>https://laviniaenache.com/images/portraits/tree.jpg</image:loc>
-      <image:title>tree</image:title>
     </image:image>
   </url>
 </urlset>

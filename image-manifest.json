@@ -1,16 +1,17 @@
 {
   "categories": [
     {
-      "name": "Abstract",
-      "slug": "abstract",
+      "name": "Animations",
+      "slug": "animations",
       "images": [
         {
-          "file": "images/abstract/abstract.jpg",
-          "alt": "abstract",
-          "w": 2400,
-          "h": 1600,
-          "thumb": "images/abstract/thumbs/abstract.webp",
-          "added": "2020-01-01"
+          "file": "images/animations/Unnamed.mp4",
+          "alt": "Unnamed",
+          "w": 1700,
+          "h": 1080,
+          "video": true,
+          "thumb": "images/animations/thumbs/Unnamed.webp",
+          "added": "2026-04-06"
         }
       ]
     },
@@ -25,28 +26,6 @@
           "h": 1506,
           "thumb": "images/awesome/thumbs/lake.webp",
           "added": "2026-04-06"
-        }
-      ]
-    },
-    {
-      "name": "Portraits",
-      "slug": "portraits",
-      "images": [
-        {
-          "file": "images/portraits/tree 2.jpg",
-          "alt": "tree 2",
-          "w": 1200,
-          "h": 1200,
-          "thumb": "images/portraits/thumbs/tree 2.webp",
-          "added": "2020-01-01"
-        },
-        {
-          "file": "images/portraits/tree.jpg",
-          "alt": "tree",
-          "w": 1157,
-          "h": 1280,
-          "thumb": "images/portraits/thumbs/tree.webp",
-          "added": "2020-01-01"
         }
       ]
     }
