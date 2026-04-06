@@ -3,9 +3,6 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://laviniaenache.com/</loc>
-    <image:image>
-      <image:loc>https://laviniaenache.com/images/awesome/lake.jpg</image:loc>
-      <image:title>lake</image:title>
-    </image:image>
+
   </url>
 </urlset>

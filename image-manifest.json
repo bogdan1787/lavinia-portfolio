@@ -14,20 +14,6 @@
           "added": "2026-04-06"
         }
       ]
-    },
-    {
-      "name": "Awesome",
-      "slug": "awesome",
-      "images": [
-        {
-          "file": "images/awesome/lake.jpg",
-          "alt": "lake",
-          "w": 2400,
-          "h": 1506,
-          "thumb": "images/awesome/thumbs/lake.webp",
-          "added": "2026-04-06"
-        }
-      ]
     }
   ]
 }
