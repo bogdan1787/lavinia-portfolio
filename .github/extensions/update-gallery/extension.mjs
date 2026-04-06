@@ -1,7 +1,8 @@
 // Extension: update-gallery
 // One-command gallery publisher for Lavinia Enache's portfolio.
-// Handles git sync (pull/rebase/conflicts), image optimization, manifest
-// generation, validation, commit, and push — all transparently.
+// Syncs with GitHub (pull/rebase), commits any local changes, and pushes.
+// Image optimisation, manifest generation, and validation all run in CI
+// (GitHub Actions) automatically after the push — no local tooling required.
 
 import { execFile } from "node:child_process";
 import { joinSession } from "@github/copilot-sdk/extension";
@@ -51,8 +52,8 @@ const session = await joinSession({
             additionalContext:
                 "This is Lavinia Enache's artist portfolio (laviniaenache.com). " +
                 "When the user wants to publish new artwork or update the website, " +
-                "use the `publish_gallery` tool — it handles everything (sync, " +
-                "optimize, commit, push) in one step without needing git knowledge.",
+                "use the `publish_gallery` tool — it syncs, commits, and pushes in " +
+                "one step. GitHub Actions handles image processing automatically.",
         }),
     },
 
@@ -61,10 +62,10 @@ const session = await joinSession({
             name: "publish_gallery",
             description:
                 "Publish Lavinia's portfolio to GitHub Pages in one step. " +
-                "Syncs with GitHub (pull/rebase), processes new images " +
-                "(resize, watermark, thumbnail), regenerates the manifest, " +
-                "validates everything, commits, and pushes. " +
-                "Use this whenever the artist adds images or wants to update the site.",
+                "Syncs with GitHub (pull/rebase), commits any pending changes, " +
+                "and pushes. GitHub Actions then automatically optimises images " +
+                "(resize, watermark, thumbnail), regenerates the manifest, and deploys. " +
+                "Use this whenever the artist adds images/videos or wants to update the site.",
             skipPermission: true,
             parameters: {
                 type: "object",
@@ -78,8 +79,8 @@ const session = await joinSession({
                 },
             },
             handler: async (args) => {
-                const cwd  = process.cwd();
-                const log  = [];
+                const cwd = process.cwd();
+                const log = [];
 
                 // ── 1. Sync with remote ──────────────────────────────────────
                 await session.log("📥 Syncing with GitHub…", { ephemeral: true });
@@ -90,7 +91,6 @@ const session = await joinSession({
                     ) || out.split("\n")[0];
                     log.push(`✓ Synced  (${summary})`);
                 } catch (err) {
-                    // Detect conflict in output even when exit code is non-zero
                     if (/CONFLICT|conflict/i.test(err.output)) {
                         return (
                             "❌ Merge conflict detected — cannot auto-resolve.\n\n" +
@@ -102,39 +102,7 @@ const session = await joinSession({
                     return `❌ Sync failed:\n${err.output || err.message}`;
                 }
 
-                // ── 2. Optimize images ───────────────────────────────────────
-                await session.log("🖼️  Optimizing images…", { ephemeral: true });
-                let optimizerOut = "";
-                try {
-                    optimizerOut = await run("python optimize-images.py", cwd);
-                    const processed = (optimizerOut.match(/✓\s+[^\n]+/g) || [])
-                        .filter(l => !/Font|Manifest|already/i.test(l))
-                        .slice(0, 8)
-                        .join("\n    ");
-                    log.push("✓ Images processed" + (processed ? `\n    ${processed}` : " (no new files)"));
-                } catch (err) {
-                    return `❌ Image optimization failed:\n${err.output || err.message}`;
-                }
-
-                // ── 3. Generate manifest ─────────────────────────────────────
-                await session.log("📋 Generating manifest…", { ephemeral: true });
-                try {
-                    await run("python generate-manifest.py", cwd);
-                    log.push("✓ Manifest updated");
-                } catch (err) {
-                    return `❌ Manifest generation failed:\n${err.output || err.message}`;
-                }
-
-                // ── 4. Validate ──────────────────────────────────────────────
-                await session.log("✅ Validating…", { ephemeral: true });
-                try {
-                    await run("python validate.py", cwd);
-                    log.push("✓ Validation passed");
-                } catch (err) {
-                    return `❌ Validation failed — nothing was committed:\n${err.output || err.message}`;
-                }
-
-                // ── 5. Check for changes ─────────────────────────────────────
+                // ── 2. Check for changes ─────────────────────────────────────
                 let status = "";
                 try {
                     status = await run("git status --porcelain", cwd);
@@ -146,10 +114,10 @@ const session = await joinSession({
                     return `✅ Everything is already up to date — nothing to publish.\n\n${log.join("\n")}`;
                 }
 
-                // ── 6. Commit ────────────────────────────────────────────────
+                // ── 3. Commit ────────────────────────────────────────────────
                 await session.log("💾 Committing…", { ephemeral: true });
                 try {
-                    const msg = args.commit_message || await buildCommitMessage(cwd);
+                    const msg     = args.commit_message || await buildCommitMessage(cwd);
                     const safeMsg = msg.replace(/"/g, '\\"').replace(/`/g, "'");
                     await run("git add -A", cwd);
                     await run(`git commit -m "${safeMsg}"`, cwd);
@@ -158,11 +126,12 @@ const session = await joinSession({
                     return `❌ Commit failed:\n${err.output || err.message}`;
                 }
 
-                // ── 7. Push ──────────────────────────────────────────────────
-                await session.log("🚀 Pushing to GitHub Pages…", { ephemeral: true });
+                // ── 4. Push ──────────────────────────────────────────────────
+                await session.log("🚀 Pushing to GitHub…", { ephemeral: true });
                 try {
                     await run("git push", cwd);
-                    log.push("✓ Live on laviniaenache.com  (GitHub Pages deploys in ~1 min)");
+                    log.push("✓ Pushed — GitHub Actions is now optimising images & deploying\n" +
+                             "  (~1–2 min until live on laviniaenache.com)");
                 } catch (err) {
                     return `❌ Push failed:\n${err.output || err.message}`;
                 }
