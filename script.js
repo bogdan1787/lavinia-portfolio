@@ -73,6 +73,31 @@ navScrollRight.addEventListener('click', () => catNavInner.scrollBy({ left:  150
 catNavInner.addEventListener('scroll', updateNavScroll, { passive: true });
 window.addEventListener('resize',       updateNavScroll, { passive: true });
 
+// ── Gallery height estimation (reduces footer CLS) ───────────────────────────
+// Uses manifest w/h to simulate CSS column layout before any image renders,
+// so the footer stays anchored while lazy images load in.
+
+function estimateGalleryHeight(categories) {
+  const GAP  = 10;   // --gap: 10px
+  const vw   = window.innerWidth;
+  const cols = vw <= 600 ? 2 : 3;
+  // Column width = (gallery width − horizontal padding − column gaps) / cols
+  const colW = Math.max(160,
+    ((gallery.clientWidth || vw) - GAP * 4 - GAP * (cols - 1)) / cols);
+
+  let total = 0;
+  for (const cat of categories) {
+    if (!cat.images.length) continue;
+    total += 44 + GAP;   // category heading + margin
+    for (const img of cat.images) {
+      const ratio = (img.w && img.h) ? img.w / img.h : 1;
+      total += colW / ratio + GAP;   // rendered height + margin-bottom
+    }
+  }
+  // CSS columns balances height across columns; add gallery vertical padding
+  return Math.round(total / cols) + GAP * 2;
+}
+
 // ── Load manifest ─────────────────────────────────────────────────────────────
 
 async function loadManifest() {
@@ -193,6 +218,7 @@ function renderNextBatch() {
   } else {
     sentinel.classList.add('hidden');
     if (scrollObserver) { scrollObserver.disconnect(); scrollObserver = null; }
+    gallery.style.minHeight = '';   // actual content fills the space now
   }
 }
 
@@ -334,6 +360,10 @@ document.addEventListener('dragstart',   e => { if (e.target.tagName === 'IMG') 
 (async () => {
   const categories  = await loadManifest();
   currentCategories = categories;
+  // Reserve estimated gallery space before any image renders → keeps footer anchored
+  if (categories.some(c => c.images.length)) {
+    gallery.style.minHeight = estimateGalleryHeight(categories) + 'px';
+  }
   buildGallery(categories);
 })();
 
