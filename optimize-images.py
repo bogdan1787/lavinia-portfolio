@@ -235,11 +235,17 @@ def draw_play_icon(img: Image.Image) -> Image.Image:
 
 
 def extract_video_frame(video_path: Path, frame_path: Path, ffmpeg_bin: str) -> None:
-    """Extract the first decoded frame from a video to a JPEG file."""
-    subprocess.run(
-        [ffmpeg_bin, "-i", str(video_path),
-         "-vframes", "1", "-q:v", "2", "-y", str(frame_path)],
-        capture_output=True, check=True, timeout=120,
+    """Extract a representative frame (≈1 s in, fallback frame 0) for the thumbnail."""
+    for seek in ("1", "0"):
+        result = subprocess.run(
+            [ffmpeg_bin, "-ss", seek, "-i", str(video_path),
+             "-vframes", "1", "-q:v", "2", "-y", str(frame_path)],
+            capture_output=True, timeout=120,
+        )
+        if result.returncode == 0 and frame_path.exists() and frame_path.stat().st_size > 0:
+            return
+    raise subprocess.CalledProcessError(
+        result.returncode, result.args, stderr=result.stderr
     )
 
 
@@ -296,11 +302,11 @@ def watermark_video(video_path: Path, ffmpeg_bin: str,
 
 def process_video(video_path: Path, ffmpeg_bin: str) -> tuple[int, int]:
     """Process an MP4 video in-place:
-      - Extract first frame → WebP thumbnail with play-button icon.
+      - Extract a representative frame → WebP thumbnail (no baked-in icon; badge handles that).
       - Burn watermark text onto every frame (re-encode with libx264).
     Returns (w, h) of the video.
     """
-    # ── 1. Extract first frame to a temp JPEG ─────────────────────────────────
+    # ── 1. Extract frame to a temp JPEG ──────────────────────────────────────
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
         frame_path = Path(tmp.name)
 
@@ -312,12 +318,11 @@ def process_video(video_path: Path, ffmpeg_bin: str) -> tuple[int, int]:
             video_w, video_h = frame_img.size
             thumb_rgba = frame_img.convert("RGBA")
             thumb_rgba.thumbnail((THUMB_PX, THUMB_PX), Image.LANCZOS)
-            thumb_with_icon = draw_play_icon(thumb_rgba)
     finally:
         frame_path.unlink(missing_ok=True)
 
-    # ── 2. Save thumbnail (reuses existing generate_thumb) ────────────────────
-    generate_thumb(thumb_with_icon, video_path)
+    # ── 2. Save thumbnail (plain frame — badge-video in the gallery indicates video) ──
+    generate_thumb(thumb_rgba, video_path)
 
     # ── 3. Burn watermark onto every frame ────────────────────────────────────
     watermark_video(video_path, ffmpeg_bin, video_w, video_h)
@@ -325,7 +330,7 @@ def process_video(video_path: Path, ffmpeg_bin: str) -> tuple[int, int]:
     return video_w, video_h
 
 
-
+def process_animated(img_path: Path) -> tuple[int, int]:
     """
     Process a multi-frame GIF or animated WebP in-place:
       - Resize every frame to MAX_PX.
