@@ -15,16 +15,16 @@
       ]
     },
     {
-      "name": "Landscapes",
-      "slug": "landscapes",
+      "name": "Awesome",
+      "slug": "awesome",
       "images": [
         {
-          "file": "images/landscapes/lake.jpg",
+          "file": "images/awesome/lake.jpg",
           "alt": "lake",
           "w": 2400,
           "h": 1506,
-          "thumb": "images/landscapes/thumbs/lake.webp",
-          "added": "2020-01-01"
+          "thumb": "images/awesome/thumbs/lake.webp",
+          "added": "2026-04-06"
         }
       ]
     },
