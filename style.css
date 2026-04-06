@@ -284,6 +284,23 @@ body {
   pointer-events: none;
 }
 
+/* Animated badge */
+.badge-anim {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(0, 0, 0, .55);
+  color: #fff;
+  font-size: .7rem;
+  line-height: 1;
+  padding: .25em .45em;
+  border-radius: 3px;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
 /* Category section headings (visible in "All" view) */
 .category-heading {
   break-inside: avoid;

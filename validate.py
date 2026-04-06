@@ -64,6 +64,10 @@ for cat in categories:
         elif disk_path.stat().st_size == 0:
             err(f"[{cat_name}] file is empty: {file_val}")
 
+        # animated flag must only appear on .gif or .webp
+        if img.get("animated") and not file_val.lower().endswith((".gif", ".webp")):
+            err(f"[{cat_name}] animated:true on non-GIF/WebP file: {file_val}")
+
 if categories:
     ok(f"All {total} image entries checked")
 
@@ -77,7 +81,12 @@ elif not og.exists():
 elif og.stat().st_size == 0:
     err("og-preview.jpg exists but is empty")
 else:
-    ok(f"og-preview.jpg exists  ({og.stat().st_size // 1024} KB)")
+    # Verify it's actually a JPEG (magic bytes FF D8)
+    magic = og.read_bytes()[:2]
+    if magic != b"\xff\xd8":
+        err(f"og-preview.jpg is not a valid JPEG (magic bytes: {magic.hex()})")
+    else:
+        ok(f"og-preview.jpg exists  ({og.stat().st_size // 1024} KB)")
 
 # ── 4. sitemap.xml ────────────────────────────────────────────────────────────
 

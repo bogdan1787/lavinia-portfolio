@@ -12,6 +12,12 @@ Pipeline per image (runs exactly once per unique file, tracked by SHA-256):
   3. Burn watermark: "© Lavinia Gabriela Enache" — bottom-right, Playfair Display Italic
   4. Record SHA-256 of final file → stored in image-hashes.json
 
+Animated GIF / animated WebP:
+  - Every frame is resized to max 2400 px.
+  - Watermark is burned onto frame 0 only.
+  - A static WebP thumbnail (no watermark) is generated from frame 0.
+  - Per-frame timing/loop/disposal metadata is preserved on re-save.
+
 On subsequent runs the hash is unchanged → step skipped entirely.
 To re-process an image (e.g. after changing watermark text), delete its
 entry from image-hashes.json or delete the file entirely.
@@ -22,12 +28,12 @@ import json
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFont, ImageSequence
 except ImportError:
     import subprocess, sys
     print("Installing Pillow…")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow", "-q"])
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -123,6 +129,9 @@ def save_image(result: Image.Image, path: Path):
         result.save(path, "PNG", optimize=True)
     elif fmt == ".webp":
         result.save(path, "WEBP", quality=JPEG_Q, method=6)
+    elif fmt == ".gif":
+        # Single-frame GIF: convert to palette and save
+        result.convert("RGB").convert("P", palette=Image.ADAPTIVE).save(path, "GIF")
 
 
 def generate_thumb(rgba_img: Image.Image, original_path: Path) -> Path:
@@ -140,6 +149,88 @@ def generate_thumb(rgba_img: Image.Image, original_path: Path) -> Path:
     thumb.thumbnail((THUMB_PX, THUMB_PX), Image.LANCZOS)
     save_image(thumb, thumb_path)
     return thumb_path
+
+
+def is_animated(img: Image.Image) -> bool:
+    """Return True if the image has more than one frame."""
+    try:
+        return getattr(img, "n_frames", 1) > 1
+    except Exception:
+        return False
+
+
+def process_animated(img_path: Path) -> tuple[int, int]:
+    """
+    Process a multi-frame GIF or animated WebP in-place:
+      - Resize every frame to MAX_PX.
+      - Watermark frame 0 only.
+      - Re-save the animated file preserving timing/loop metadata.
+      - Generate a static WebP thumbnail from frame 0.
+    Returns (w, h) of the first frame after resizing.
+    """
+    fmt = img_path.suffix.lower()
+
+    with Image.open(img_path) as src:
+        src.load()
+        info = src.info.copy()  # loop, background, duration, etc.
+
+        frames      = []
+        durations   = []
+        disposals   = []
+
+        for frame in ImageSequence.Iterator(src):
+            frame_info = frame.info
+            dur  = frame_info.get("duration", info.get("duration", 100))
+            disp = frame_info.get("disposal_method", 2)
+            durations.append(dur)
+            disposals.append(disp)
+
+            # Convert to RGBA for uniform processing
+            rgba = frame.convert("RGBA")
+
+            # Resize every frame (preserves aspect ratio)
+            if max(rgba.width, rgba.height) > MAX_PX:
+                rgba.thumbnail((MAX_PX, MAX_PX), Image.LANCZOS)
+
+            frames.append(rgba)
+
+    if not frames:
+        raise ValueError("No frames found")
+
+    final_w, final_h = frames[0].size
+
+    # Watermark frame 0 only
+    frames[0] = apply_watermark(frames[0])
+
+    # Generate static thumbnail from watermarked frame 0
+    generate_thumb(frames[0].copy(), img_path)
+
+    # Re-save all frames back to the original file
+    loop  = info.get("loop", 0)
+
+    if fmt == ".gif":
+        # Convert RGBA frames to palette mode for GIF
+        p_frames = [f.convert("RGB").convert("P", palette=Image.ADAPTIVE) for f in frames]
+        p_frames[0].save(
+            img_path, format="GIF", save_all=True,
+            append_images=p_frames[1:],
+            loop=loop,
+            duration=durations,
+            disposal=disposals,
+            optimize=False,
+        )
+    else:
+        # Animated WebP
+        frames[0].save(
+            img_path, format="WEBP", save_all=True,
+            append_images=frames[1:],
+            loop=loop,
+            duration=durations,
+            quality=JPEG_Q,
+            method=6,
+        )
+
+    return final_w, final_h
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -161,7 +252,7 @@ for img_path in sorted(IMAGES_DIR.rglob("*")):
     # Skip thumbnails (they live in thumbs/ subdirs and are auto-generated)
     if "thumbs" in img_path.parts:
         continue
-    if img_path.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
+    if img_path.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
         continue
 
     key          = img_path.relative_to(IMAGES_DIR.parent).as_posix()
@@ -178,20 +269,28 @@ for img_path in sorted(IMAGES_DIR.rglob("*")):
 
     try:
         with Image.open(img_path) as img:
-            w, h = img.size
-            if max(w, h) > MAX_PX:
-                img.thumbnail((MAX_PX, MAX_PX), Image.LANCZOS)
-            final_w, final_h = img.size
+            animated = is_animated(img)
 
-            result = apply_watermark(img)
+        if animated:
+            final_w, final_h = process_animated(img_path)
+        else:
+            with Image.open(img_path) as img:
+                w, h = img.size
+                if max(w, h) > MAX_PX:
+                    img.thumbnail((MAX_PX, MAX_PX), Image.LANCZOS)
+                final_w, final_h = img.size
 
-        save_image(result, img_path)
-        generate_thumb(result, img_path)   # 400px thumbnail, no watermark
+                result = apply_watermark(img)
+
+            save_image(result, img_path)
+            generate_thumb(result, img_path)
 
         new_size    = img_path.stat().st_size
         saving      = round((1 - new_size / orig_size) * 100) if orig_size else 0
-        hashes[key] = {"hash": sha256(img_path), "w": final_w, "h": final_h}
-        print(f"  ✓  {key}  {orig_size // 1024} KB → {new_size // 1024} KB  (−{saving}%)")
+        hashes[key] = {"hash": sha256(img_path), "w": final_w, "h": final_h,
+                       **({"animated": True} if animated else {})}
+        tag = " [animated]" if animated else ""
+        print(f"  ✓  {key}{tag}  {orig_size // 1024} KB → {new_size // 1024} KB  (−{saving}%)")
         changed += 1
 
     except Exception as e:
@@ -202,7 +301,7 @@ live_keys = {
     img_path.relative_to(IMAGES_DIR.parent).as_posix()
     for img_path in IMAGES_DIR.rglob("*")
     if "thumbs" not in img_path.parts
-    and img_path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
+    and img_path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 }
 pruned = {k for k in hashes if k not in live_keys}
 if pruned:

@@ -106,6 +106,7 @@ function buildGallery(categories) {
         w           : img.w   || null,
         h           : img.h   || null,
         added       : img.added || null,
+        animated    : img.animated || false,
         category    : cat.slug,
         categoryName: cat.name,
       });
@@ -148,7 +149,7 @@ function buildRenderQueue(slug, categories) {
         const item = {
           file: img.file, thumb: img.thumb || img.file,
           alt: img.alt, w: img.w || null, h: img.h || null,
-          added: img.added || null,
+          added: img.added || null, animated: img.animated || false,
           category: cat.slug, categoryName: cat.name,
         };
         filteredImages.push(item);
@@ -237,6 +238,14 @@ function makeItem(img, idx, batchPos = 0) {
       badge.textContent = 'New';
       div.appendChild(badge);
     }
+  }
+
+  // Animated badge
+  if (img.animated) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-anim';
+    badge.textContent = '▶';
+    div.appendChild(badge);
   }
 
   div.addEventListener('click', () => openLightbox(idx));

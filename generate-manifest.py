@@ -24,6 +24,12 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from PIL import Image as _PILImage
+    _PIL_AVAILABLE = True
+except ImportError:
+    _PIL_AVAILABLE = False
+
 IMAGES_DIR   = Path(__file__).parent / "images"
 MANIFEST_OUT = Path(__file__).parent / "image-manifest.json"
 DATES_FILE   = Path(__file__).parent / "image-dates.json"
@@ -59,11 +65,14 @@ def image_entry(rel: Path, filename: str) -> dict:
     file_key = rel.as_posix()
     entry    = {"file": file_key, "alt": alt}
 
-    # Dimensions from hashes (enables aspect-ratio pre-reservation in browser)
+    # Dimensions and animated flag from hashes (written by optimize-images.py)
     meta = _hashes_raw.get(file_key)
-    if isinstance(meta, dict) and meta.get("w") and meta.get("h"):
-        entry["w"] = meta["w"]
-        entry["h"] = meta["h"]
+    if isinstance(meta, dict):
+        if meta.get("w") and meta.get("h"):
+            entry["w"] = meta["w"]
+            entry["h"] = meta["h"]
+        if meta.get("animated"):
+            entry["animated"] = True
 
     # Thumbnail path — saved as .webp by optimize-images.py
     thumb_name = Path(filename).stem + ".webp"
@@ -158,7 +167,15 @@ first_img = next(
     None
 )
 if first_img and first_img.exists():
-    shutil.copy2(first_img, OG_PREVIEW)
+    if first_img.suffix.lower() in {".jpg", ".jpeg"}:
+        shutil.copy2(first_img, OG_PREVIEW)
+    elif _PIL_AVAILABLE:
+        # Convert first frame to a proper JPEG (GIF/WebP would be invalid as .jpg)
+        with _PILImage.open(first_img) as _img:
+            _img.seek(0)
+            _img.convert("RGB").save(OG_PREVIEW, "JPEG", quality=85)
+    else:
+        shutil.copy2(first_img, OG_PREVIEW)
     print(f"   ✓ Social preview → {OG_PREVIEW.name}")
 
 total = sum(len(c["images"]) for c in categories)
