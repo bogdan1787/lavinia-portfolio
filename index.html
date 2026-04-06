@@ -16,17 +16,9 @@
   <meta name="twitter:title"       content="Lavinia Gabriela Enache — Art &amp; Illustration" />
   <meta name="twitter:image"       content="https://laviniaenache.com/og-preview.jpg" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <script>
-    // Non-blocking font load — dynamically inserted stylesheets don't block rendering
-    (function() {
-      var l = document.createElement('link');
-      l.rel  = 'stylesheet';
-      l.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@300;400;500&display=optional';
-      document.head.appendChild(l);
-    })();
-  </script>
+  <!-- Preload self-hosted fonts so they start downloading with the HTML (no external chain) -->
+  <link rel="preload" href="fonts/playfair-display-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="style.css" />
   <!-- Prevent flash of wrong theme before CSS loads -->
   <script>(function(){var t=localStorage.getItem('lgfe-theme')||'dark';document.documentElement.dataset.theme=t;})()</script>
