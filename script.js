@@ -40,6 +40,7 @@ const themeToggle  = document.getElementById('themeToggle');
 const emptyState   = document.getElementById('emptyState');
 const lightbox     = document.getElementById('lightbox');
 const lbImg        = document.getElementById('lbImg');
+const lbVideo      = document.getElementById('lbVideo');
 const lbCaption    = document.getElementById('lbCaption');
 const lbClose      = document.getElementById('lbClose');
 const lbPrev       = document.getElementById('lbPrev');
@@ -132,6 +133,7 @@ function buildGallery(categories) {
         h           : img.h   || null,
         added       : img.added || null,
         animated    : img.animated || false,
+        video       : img.video    || false,
         category    : cat.slug,
         categoryName: cat.name,
       });
@@ -175,6 +177,7 @@ function buildRenderQueue(slug, categories) {
           file: img.file, thumb: img.thumb || img.file,
           alt: img.alt, w: img.w || null, h: img.h || null,
           added: img.added || null, animated: img.animated || false,
+          video: img.video || false,
           category: cat.slug, categoryName: cat.name,
         };
         filteredImages.push(item);
@@ -266,8 +269,13 @@ function makeItem(img, idx, batchPos = 0) {
     }
   }
 
-  // Animated badge
-  if (img.animated) {
+  // Video badge (▶ in accent colour) — mutually exclusive with animated badge
+  if (img.video) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-video';
+    badge.textContent = '▶';
+    div.appendChild(badge);
+  } else if (img.animated) {
     const badge = document.createElement('span');
     badge.className = 'badge-anim';
     badge.textContent = '▶';
@@ -303,16 +311,41 @@ function openLightbox(index) {
 function closeLightbox() {
   lightbox.classList.add('hidden');
   document.body.style.overflow = '';
+  if (!lbVideo.classList.contains('hidden')) {
+    lbVideo.pause();
+    lbVideo.removeAttribute('src');
+    lbVideo.load();
+    lbVideo.classList.add('hidden');
+  }
 }
 
 function renderLightbox() {
   const img = filteredImages[lightboxIndex];
-  lbImg.src = img.file;   // ← full-size image in lightbox
-  lbImg.alt = img.alt;
 
-  lbImg.style.animation = 'none';
-  lbImg.offsetHeight;
-  lbImg.style.animation = '';
+  if (img.video) {
+    lbImg.classList.add('hidden');
+    lbVideo.classList.remove('hidden');
+    lbVideo.src = img.file;
+    lbVideo.load();
+    // Reset entry animation
+    lbVideo.style.animation = 'none';
+    lbVideo.offsetHeight;
+    lbVideo.style.animation = '';
+  } else {
+    // Stop video if switching away from one
+    if (!lbVideo.classList.contains('hidden')) {
+      lbVideo.pause();
+      lbVideo.removeAttribute('src');
+      lbVideo.load();
+      lbVideo.classList.add('hidden');
+    }
+    lbImg.classList.remove('hidden');
+    lbImg.src = img.file;
+    lbImg.alt = img.alt;
+    lbImg.style.animation = 'none';
+    lbImg.offsetHeight;
+    lbImg.style.animation = '';
+  }
 
   lbCaption.textContent = img.alt
     ? `${img.alt}  ·  ${img.categoryName}`
@@ -339,6 +372,8 @@ lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightb
 document.addEventListener('keydown', e => {
   if (lightbox.classList.contains('hidden')) return;
   if (e.key === 'Escape')     closeLightbox();
+  // Don't navigate with arrows when the video element has focus (user may be seeking)
+  if (document.activeElement === lbVideo) return;
   if (e.key === 'ArrowLeft')  stepLightbox(-1);
   if (e.key === 'ArrowRight') stepLightbox(+1);
 });
@@ -346,6 +381,8 @@ document.addEventListener('keydown', e => {
 let touchStartX = 0;
 lightbox.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
 lightbox.addEventListener('touchend',   e => {
+  // Don't navigate when swiping on the video player (may be seeking)
+  if (lbVideo.contains(e.target)) return;
   const dx = e.changedTouches[0].clientX - touchStartX;
   if (Math.abs(dx) > 50) stepLightbox(dx < 0 ? +1 : -1);
 });

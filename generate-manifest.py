@@ -38,7 +38,7 @@ DATES_FILE   = Path(__file__).parent / "image-dates.json"
 HASHES_FILE  = Path(__file__).parent / "image-hashes.json"
 SITEMAP_OUT  = Path(__file__).parent / "sitemap.xml"
 OG_PREVIEW   = Path(__file__).parent / "og-preview.jpg"
-SUPPORTED    = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg"}
+SUPPORTED    = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg", ".mp4"}
 
 # Update this when you add a custom domain
 SITE_URL = "https://laviniaenache.com"
@@ -58,16 +58,25 @@ def slug_to_label(slug: str) -> str:
     return " ".join(w.capitalize() for w in words if w)
 
 
-def image_entry(rel: Path, filename: str) -> dict:
+def image_entry(rel: Path, filename: str) -> dict | None:
     stem  = Path(filename).stem
     # Strip leading numeric order prefix from display name
     clean = ORDER_PREFIX.sub("", stem)
     alt   = re.sub(r"[-_]+", " ", clean).strip() or stem
 
     file_key = rel.as_posix()
+
+    # MP4 files must have been processed by optimize-images.py (video:true in hashes).
+    # Exclude unprocessed videos so the gallery never gets a broken <img src="...mp4">.
+    if Path(filename).suffix.lower() == ".mp4":
+        meta = _hashes_raw.get(file_key)
+        if not isinstance(meta, dict) or not meta.get("video"):
+            print(f"  ⚠  Skipping unprocessed video (run optimize-images.py first): {file_key}")
+            return None
+
     entry    = {"file": file_key, "alt": alt}
 
-    # Dimensions and animated flag from hashes (written by optimize-images.py)
+    # Dimensions and animated/video flags from hashes (written by optimize-images.py)
     meta = _hashes_raw.get(file_key)
     if isinstance(meta, dict):
         if meta.get("w") and meta.get("h"):
@@ -75,6 +84,8 @@ def image_entry(rel: Path, filename: str) -> dict:
             entry["h"] = meta["h"]
         if meta.get("animated"):
             entry["animated"] = True
+        if meta.get("video"):
+            entry["video"] = True
 
     # Thumbnail path — saved as .webp by optimize-images.py
     thumb_name = Path(filename).stem + ".webp"
@@ -98,7 +109,9 @@ def scan_dir(directory: Path, slug: str) -> list:
                  if f.is_file() and f.suffix.lower() in SUPPORTED]
         files.sort(key=lambda f: sort_key(f.name))
         for f in files:
-            images.append(image_entry(Path("images") / slug / f.name, f.name))
+            entry = image_entry(Path("images") / slug / f.name, f.name)
+            if entry is not None:
+                images.append(entry)
     except PermissionError:
         pass
     return images
@@ -116,7 +129,9 @@ entries    = sorted(IMAGES_DIR.iterdir(), key=lambda e: e.name.lower())
 # Images directly in images/ root → "General"
 root_files = [e for e in entries if e.is_file() and e.suffix.lower() in SUPPORTED]
 root_files.sort(key=lambda f: sort_key(f.name))
-root_images = [image_entry(Path("images") / e.name, e.name) for e in root_files]
+root_images = [e for e in
+               (image_entry(Path("images") / e.name, e.name) for e in root_files)
+               if e is not None]
 if root_images:
     categories.append({"name": "General", "slug": "general", "images": root_images})
 
@@ -201,6 +216,7 @@ img_tags = "\n".join(
     f'    </image:image>'
     for cat in categories
     for img in cat["images"]
+    if not img.get("video")   # videos are not images — exclude from image sitemap
 )
 sitemap = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"

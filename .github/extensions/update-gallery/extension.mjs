@@ -33,7 +33,7 @@ async function buildCommitMessage(cwd) {
     try {
         const status = await run("git status --porcelain", cwd);
         const lines  = status.split("\n").filter(Boolean);
-        const imgs   = lines.filter(l => /\.(gif|jpg|jpeg|png|webp)$/i.test(l));
+        const imgs   = lines.filter(l => /\.(gif|jpg|jpeg|png|webp|mp4)$/i.test(l));
         if (imgs.length === 0) return "Update gallery";
         if (imgs.length === 1) {
             const name = imgs[0].replace(/^.{3}/, "").trim().split(/[\\/]/).pop();

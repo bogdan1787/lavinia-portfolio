@@ -68,6 +68,19 @@ for cat in categories:
         if img.get("animated") and not file_val.lower().endswith((".gif", ".webp")):
             err(f"[{cat_name}] animated:true on non-GIF/WebP file: {file_val}")
 
+        # video flag must only appear on .mp4
+        if img.get("video") and not file_val.lower().endswith(".mp4"):
+            err(f"[{cat_name}] video:true on non-MP4 file: {file_val}")
+
+        # .mp4 files must have been fully processed: video flag, dimensions, and thumb
+        if file_val.lower().endswith(".mp4"):
+            if not img.get("video"):
+                err(f"[{cat_name}] .mp4 file missing video:true flag: {file_val}")
+            if not (img.get("w") and img.get("h")):
+                err(f"[{cat_name}] .mp4 file missing dimensions (w/h): {file_val}")
+            if not img.get("thumb"):
+                warn(f"[{cat_name}] .mp4 file missing thumb (run optimize-images.py): {file_val}")
+
         # declared thumb must exist on disk and must stay inside images/
         thumb_val = img.get("thumb")
         if thumb_val:

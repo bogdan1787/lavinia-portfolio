@@ -324,6 +324,23 @@ body {
   -webkit-backdrop-filter: blur(4px);
 }
 
+/* Video badge (▶ in accent colour, distinguishes from animated GIFs) */
+.badge-video {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(0, 0, 0, .55);
+  color: var(--accent);
+  font-size: .7rem;
+  line-height: 1;
+  padding: .25em .45em;
+  border-radius: 3px;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
 /* Category section headings (visible in "All" view) */
 .category-heading {
   break-inside: avoid;
@@ -435,6 +452,14 @@ body {
   user-select: none;
   -webkit-user-select: none;
   pointer-events: none;
+}
+
+#lbVideo {
+  max-width: 90vw;
+  max-height: 80vh;
+  border-radius: var(--radius);
+  animation: img-in .3s var(--ease) both;
+  box-shadow: 0 20px 80px rgba(0,0,0,.6);
 }
 
 @keyframes img-in {
