@@ -23,6 +23,8 @@ import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
+import html as _html
 
 try:
     from PIL import Image as _PILImage
@@ -161,11 +163,17 @@ DATES_FILE.write_text(json.dumps(dates, indent=2) + "\n", encoding="utf-8")
 MANIFEST_OUT.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 # ── Social preview ────────────────────────────────────────────────────────────
-first_img = next(
-    (Path(__file__).parent / c["images"][0]["file"]
-     for c in categories if c["images"]),
-    None
-)
+# Only use formats we can reliably rasterize as JPEG (not SVG/AVIF)
+_OG_SAFE = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+first_img = None
+for _c in categories:
+    for _im in _c["images"]:
+        if Path(_im["file"]).suffix.lower() in _OG_SAFE:
+            first_img = Path(__file__).parent / _im["file"]
+            break
+    if first_img:
+        break
+
 if first_img and first_img.exists():
     if first_img.suffix.lower() in {".jpg", ".jpeg"}:
         shutil.copy2(first_img, OG_PREVIEW)
@@ -188,8 +196,8 @@ for c in categories:
 # ── Sitemap ───────────────────────────────────────────────────────────────────
 img_tags = "\n".join(
     f'    <image:image>\n'
-    f'      <image:loc>{SITE_URL}/{img["file"]}</image:loc>\n'
-    f'      <image:title>{img["alt"]}</image:title>\n'
+    f'      <image:loc>{SITE_URL}/{quote(img["file"])}</image:loc>\n'
+    f'      <image:title>{_html.escape(img["alt"])}</image:title>\n'
     f'    </image:image>'
     for cat in categories
     for img in cat["images"]

@@ -25,15 +25,16 @@ entry from image-hashes.json or delete the file entirely.
 
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw, ImageFont, ImageSequence
+    from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageSequence
 except ImportError:
     import subprocess, sys
     print("Installing Pillow…")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow", "-q"])
-    from PIL import Image, ImageDraw, ImageFont, ImageSequence
+    from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageSequence
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -130,8 +131,9 @@ def save_image(result: Image.Image, path: Path):
     elif fmt == ".webp":
         result.save(path, "WEBP", quality=JPEG_Q, method=6)
     elif fmt == ".gif":
-        # Single-frame GIF: convert to palette and save
-        result.convert("RGB").convert("P", palette=Image.ADAPTIVE).save(path, "GIF")
+        # Quantize RGBA → palette, preserving transparency index (no RGB round-trip)
+        p = result.quantize(colors=255)
+        p.save(path, "GIF", transparency=p.info.get("transparency", 255))
 
 
 def generate_thumb(rgba_img: Image.Image, original_path: Path) -> Path:
@@ -164,7 +166,7 @@ def process_animated(img_path: Path) -> tuple[int, int]:
     Process a multi-frame GIF or animated WebP in-place:
       - Resize every frame to MAX_PX.
       - Watermark frame 0 only.
-      - Re-save the animated file preserving timing/loop metadata.
+      - Re-save the animated file preserving timing/loop metadata (atomic).
       - Generate a static WebP thumbnail from frame 0.
     Returns (w, h) of the first frame after resizing.
     """
@@ -181,7 +183,8 @@ def process_animated(img_path: Path) -> tuple[int, int]:
         for frame in ImageSequence.Iterator(src):
             frame_info = frame.info
             dur  = frame_info.get("duration", info.get("duration", 100))
-            disp = frame_info.get("disposal_method", 2)
+            # disposal_method is an attribute on the frame object, not in .info
+            disp = getattr(frame, "disposal_method", frame_info.get("disposal_method", 2))
             durations.append(dur)
             disposals.append(disp)
 
@@ -202,33 +205,44 @@ def process_animated(img_path: Path) -> tuple[int, int]:
     # Watermark frame 0 only
     frames[0] = apply_watermark(frames[0])
 
-    # Generate static thumbnail from watermarked frame 0
+    # Generate static thumbnail from watermarked frame 0 (uses in-memory frame)
     generate_thumb(frames[0].copy(), img_path)
 
-    # Re-save all frames back to the original file
-    loop  = info.get("loop", 0)
+    # Re-save all frames back to the original file — write atomically via temp file
+    loop = info.get("loop", 0)
 
-    if fmt == ".gif":
-        # Convert RGBA frames to palette mode for GIF
-        p_frames = [f.convert("RGB").convert("P", palette=Image.ADAPTIVE) for f in frames]
-        p_frames[0].save(
-            img_path, format="GIF", save_all=True,
-            append_images=p_frames[1:],
-            loop=loop,
-            duration=durations,
-            disposal=disposals,
-            optimize=False,
-        )
-    else:
-        # Animated WebP
-        frames[0].save(
-            img_path, format="WEBP", save_all=True,
-            append_images=frames[1:],
-            loop=loop,
-            duration=durations,
-            quality=JPEG_Q,
-            method=6,
-        )
+    with tempfile.NamedTemporaryFile(
+        dir=img_path.parent, delete=False, suffix=img_path.suffix
+    ) as tmp:
+        tmp_path = Path(tmp.name)
+
+    try:
+        if fmt == ".gif":
+            # Quantize RGBA → palette per frame, preserving transparency index
+            p_frames = [f.quantize(colors=255) for f in frames]
+            p_frames[0].save(
+                tmp_path, format="GIF", save_all=True,
+                append_images=p_frames[1:],
+                loop=loop,
+                duration=durations,
+                disposal=disposals,
+                optimize=False,
+                transparency=p_frames[0].info.get("transparency", 255),
+            )
+        else:
+            # Animated WebP
+            frames[0].save(
+                tmp_path, format="WEBP", save_all=True,
+                append_images=frames[1:],
+                loop=loop,
+                duration=durations,
+                quality=JPEG_Q,
+                method=6,
+            )
+        tmp_path.replace(img_path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
     return final_w, final_h
 
@@ -275,15 +289,24 @@ for img_path in sorted(IMAGES_DIR.rglob("*")):
             final_w, final_h = process_animated(img_path)
         else:
             with Image.open(img_path) as img:
-                w, h = img.size
-                if max(w, h) > MAX_PX:
+                img = ImageOps.exif_transpose(img)  # fix camera rotation
+                if max(img.width, img.height) > MAX_PX:
                     img.thumbnail((MAX_PX, MAX_PX), Image.LANCZOS)
                 final_w, final_h = img.size
-
                 result = apply_watermark(img)
 
-            save_image(result, img_path)
-            generate_thumb(result, img_path)
+            # Write atomically via temp file — prevents double-watermark on partial failure
+            with tempfile.NamedTemporaryFile(
+                dir=img_path.parent, delete=False, suffix=img_path.suffix
+            ) as tmp:
+                tmp_path = Path(tmp.name)
+            try:
+                save_image(result, tmp_path)
+                generate_thumb(result, img_path)
+                tmp_path.replace(img_path)
+            except Exception:
+                tmp_path.unlink(missing_ok=True)
+                raise
 
         new_size    = img_path.stat().st_size
         saving      = round((1 - new_size / orig_size) * 100) if orig_size else 0

@@ -68,6 +68,19 @@ for cat in categories:
         if img.get("animated") and not file_val.lower().endswith((".gif", ".webp")):
             err(f"[{cat_name}] animated:true on non-GIF/WebP file: {file_val}")
 
+        # declared thumb must exist on disk
+        thumb_val = img.get("thumb")
+        if thumb_val:
+            if not (ROOT / thumb_val).exists():
+                err(f"[{cat_name}] declared thumb not found on disk: {thumb_val}")
+
+        # w/h must both be positive integers if either is present
+        w_val, h_val = img.get("w"), img.get("h")
+        if w_val is not None or h_val is not None:
+            if not (isinstance(w_val, int) and w_val > 0
+                    and isinstance(h_val, int) and h_val > 0):
+                err(f"[{cat_name}] invalid w/h dimensions for: {file_val}")
+
 if categories:
     ok(f"All {total} image entries checked")
 
