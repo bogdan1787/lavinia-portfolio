@@ -52,7 +52,7 @@ const session = await joinSession({
             additionalContext:
                 "This is Lavinia Enache's artist portfolio (laviniaenache.com). " +
                 "When the user wants to publish new artwork or update the website, " +
-                "use the `publish_gallery` tool — it syncs, commits, and pushes in " +
+                "use the `update_website` tool — it syncs, commits, and pushes in " +
                 "one step. GitHub Actions handles image processing automatically.",
         }),
     },
