@@ -3,6 +3,9 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://laviniaenache.com/</loc>
-
+    <image:image>
+      <image:loc>https://laviniaenache.com/images/OC%20art/Lavi.png</image:loc>
+      <image:title>Lavi</image:title>
+    </image:image>
   </url>
 </urlset>
