@@ -5,21 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lavinia Gabriela Enache — Art &amp; Illustration</title>
   <!-- Social sharing (Open Graph + Twitter card) -->
-  <meta name="description"         content="Art and illustrations by Lavinia Gabriela Enache" />
+  <meta name="description"         content="Portfolio of Lavinia Gabriela Enache — art, illustration, and creative works. Explore paintings, animations, sketches, and mixed-media pieces." />
+  <meta name="keywords"            content="Lavinia Gabriela Enache, art, illustration, portfolio, paintings, sketches, animations" />
   <link rel="canonical" href="https://laviniaenache.com/" />
   <meta property="og:type"         content="website" />
   <meta property="og:url"          content="https://laviniaenache.com/" />
   <meta property="og:title"        content="Lavinia Gabriela Enache — Art &amp; Illustration" />
-  <meta property="og:description"  content="Art and illustrations by Lavinia Gabriela Enache" />
+  <meta property="og:description"  content="Portfolio of Lavinia Gabriela Enache — art, illustration, and creative works. Explore paintings, animations, sketches, and mixed-media pieces." />
   <meta property="og:image"        content="https://laviniaenache.com/og-preview.jpg" />
   <meta name="twitter:card"        content="summary_large_image" />
-  <meta name="twitter:title"       content="Lavinia Gabriela Enache — Art &amp; Illustration" />
+  <meta name="twitter:description" content="Portfolio of Lavinia Gabriela Enache — art, illustration, and creative works." />
   <meta name="twitter:image"       content="https://laviniaenache.com/og-preview.jpg" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <!-- Preload self-hosted fonts so they start downloading with the HTML (no external chain) -->
-  <link rel="preload" href="fonts/playfair-display-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';" />
   <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="image-manifest.json" as="fetch" type="application/json" crossorigin />
+  <style>
+    .gallery-item picture, .gallery-item picture img { width: 100%; height: auto; display: block; border-radius: var(--radius); }
+  </style>
   <link rel="stylesheet" href="style.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "Lavinia Gabriela Enache",
+    "jobTitle": "Artist & Illustrator",
+    "url": "https://laviniaenache.com",
+    "image": "https://laviniaenache.com/og-preview.jpg",
+    "sameAs": []
+  }
+  </script>
   <!-- Prevent flash of wrong theme before CSS loads -->
   <script>(function(){var t=localStorage.getItem('lgfe-theme')||'dark';document.documentElement.dataset.theme=t;})()</script>
 </head>
@@ -75,13 +91,22 @@
     <button class="lb-prev"   id="lbPrev"   aria-label="Previous image">&#x276E;</button>
     <button class="lb-next"   id="lbNext"   aria-label="Next image">&#x276F;</button>
     <figure class="lb-figure">
-      <img id="lbImg" src="" alt="" />
+      <img id="lbImg" alt="" />
       <video id="lbVideo" controls playsinline preload="none" class="hidden"></video>
       <figcaption id="lbCaption"></figcaption>
     </figure>
   </div>
 
   <script src="script.js" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('SW registered:', reg.scope))
+          .catch(err => console.warn('SW registration failed:', err));
+      });
+    }
+  </script>
 
   <footer class="site-footer">
     <p>&copy; <span id="footerYear"></span> Lavinia Gabriela Enache &mdash; All rights reserved.</p>

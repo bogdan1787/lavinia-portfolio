@@ -104,10 +104,17 @@ function estimateGalleryHeight(categories) {
 async function loadManifest() {
   try {
     const res = await fetch('image-manifest.json', { cache: 'no-cache' });
-    if (!res.ok) throw new Error('not found');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const manifest = await res.json();
     return manifest.categories || [];
-  } catch {
+  } catch (err) {
+    console.error('Failed to load image manifest:', err);
+    gallery.innerHTML = (
+      '<div class="empty-state"><div class="empty-inner">' +
+      '<h2>Unable to load gallery</h2>' +
+      '<p>Please check your connection and refresh the page.</p>' +
+      '</div></div>'
+    );
     return [];
   }
 }
@@ -128,6 +135,7 @@ function buildGallery(categories) {
       allImages.push({
         file        : img.file,
         thumb       : img.thumb || img.file,  // fallback to full if no thumb yet
+        avif        : img.avif || null,
         alt         : img.alt,
         w           : img.w   || null,
         h           : img.h   || null,
@@ -174,7 +182,7 @@ function buildRenderQueue(slug, categories) {
       cat.images.forEach(img => {
         const idx  = filteredImages.length;
         const item = {
-          file: img.file, thumb: img.thumb || img.file,
+          file: img.file, thumb: img.thumb || img.file, avif: img.avif || null,
           alt: img.alt, w: img.w || null, h: img.h || null,
           added: img.added || null, animated: img.animated || false,
           video: img.video || false,
@@ -242,8 +250,23 @@ function makeItem(img, idx, batchPos = 0) {
   div.dataset.index = idx;
   div.style.animationDelay = `${Math.min(batchPos, 12) * 0.04}s`;
 
-  const image = document.createElement('img');
-  image.src       = img.thumb;   // ← small thumbnail for the grid
+  let image;
+  if (img.avif) {
+    const picture = document.createElement('picture');
+    const source  = document.createElement('source');
+    source.srcset = img.avif;
+    source.type   = 'image/avif';
+    picture.appendChild(source);
+    image = document.createElement('img');
+    image.src = img.thumb;   // fallback for non-AVIF browsers
+    picture.appendChild(image);
+    div.appendChild(picture);
+  } else {
+    image = document.createElement('img');
+    image.src = img.thumb;
+    div.appendChild(image);
+  }
+
   image.alt       = img.alt || '';
   image.loading   = 'lazy';
   image.decoding  = 'async';
@@ -255,7 +278,6 @@ function makeItem(img, idx, batchPos = 0) {
   caption.className = 'item-caption';
   caption.textContent = img.alt;
 
-  div.appendChild(image);
   div.appendChild(caption);
 
   // "New" badge — shown for 30 days after first upload
@@ -341,7 +363,12 @@ function renderLightbox() {
       lbVideo.classList.add('hidden');
     }
     lbImg.classList.remove('hidden');
-    lbImg.src = img.file;
+    // Use AVIF in lightbox if available, else original file
+    if (img.avif) {
+      lbImg.src = img.avif;
+    } else {
+      lbImg.src = img.file;
+    }
     lbImg.alt = img.alt;
     lbImg.style.animation = 'none';
     lbImg.offsetHeight;

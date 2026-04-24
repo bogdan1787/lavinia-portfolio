@@ -8,9 +8,13 @@ on:
       - "index.html"
       - "style.css"
       - "script.js"
+      - "sw.js"
+      - ".lighthouserc.json"
       - "CNAME"
       - "generate-manifest.py"
       - "optimize-images.py"
+      - "hash-assets.py"
+      - "validate.py"
   workflow_dispatch:       # allow a manual run from the Actions tab
 
 permissions:
@@ -30,12 +34,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Pillow, fonts, and ffmpeg
+      - name: Install Pillow, fonts, ffmpeg, and AVIF support
         run: |
           pip install Pillow --quiet
-          sudo apt-get install -y fonts-urw-base35 ffmpeg
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-urw-base35 ffmpeg libavif-dev
 
-      - name: Optimize images
+      - name: Optimize images (with AVIF)
         run: python optimize-images.py
 
       - name: Generate manifest & sitemap
@@ -44,12 +49,15 @@ jobs:
       - name: Validate output
         run: python validate.py
 
+      - name: Cache-bust static assets
+        run: python hash-assets.py
+
       - name: Commit changes
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add image-manifest.json image-dates.json image-hashes.json og-preview.jpg sitemap.xml
-          git add images/ fonts/
+          git add images/ fonts/ sw.js hash-assets.py
           if git diff --staged --quiet; then
             echo "Nothing to commit."
           else
@@ -57,7 +65,20 @@ jobs:
             git push
           fi
 
-  # ── 2. Deploy to GitHub Pages ───────────────────────────────────────────────
+  # ── 2. Lighthouse CI ────────────────────────────────────────────────────────
+  lighthouse:
+    needs: update-manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: '.lighthouserc.json'
+
+  # ── 3. Deploy to GitHub Pages ───────────────────────────────────────────────
   deploy:
     needs: update-manifest
     runs-on: ubuntu-latest

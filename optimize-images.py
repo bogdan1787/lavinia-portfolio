@@ -32,6 +32,7 @@ entry from image-hashes.json or delete the file entirely.
 """
 
 import hashlib
+import io
 import json
 import shutil
 import subprocess
@@ -154,8 +155,37 @@ def save_image(result: Image.Image, path: Path):
         result.save(path, "PNG", optimize=True)
     elif fmt == ".webp":
         result.save(path, "WEBP", quality=JPEG_Q, method=6)
+    elif fmt == ".avif":
+        result.save(path, "AVIF", quality=JPEG_Q)
     elif fmt == ".gif":
         rgba_to_palette(result).save(path, "GIF", transparency=255)
+
+
+_AVIF_AVAILABLE = None
+
+def avif_available() -> bool:
+    """Detect whether Pillow can write AVIF."""
+    global _AVIF_AVAILABLE
+    if _AVIF_AVAILABLE is not None:
+        return _AVIF_AVAILABLE
+    try:
+        Image.new("RGB", (1, 1)).save(io.BytesIO(), "AVIF")
+        _AVIF_AVAILABLE = True
+    except Exception:
+        _AVIF_AVAILABLE = False
+    return _AVIF_AVAILABLE
+
+
+def generate_avif(rgba_img: Image.Image, original_path: Path) -> Path | None:
+    """Save an AVIF version next to the original and return its path."""
+    if not avif_available():
+        return None
+    avif_path = original_path.with_suffix(".avif")
+    try:
+        rgba_img.save(avif_path, "AVIF", quality=JPEG_Q)
+        return avif_path
+    except Exception:
+        return None
 
 
 def generate_thumb(rgba_img: Image.Image, original_path: Path) -> Path:
@@ -489,16 +519,20 @@ for img_path in sorted(IMAGES_DIR.rglob("*")):
                     save_image(result, tmp_path)
                     tmp_path.replace(img_path)
                     generate_thumb(result, img_path)
+                    avif_path = generate_avif(result, img_path)
                 except Exception:
                     tmp_path.unlink(missing_ok=True)
                     raise
 
             new_size    = img_path.stat().st_size
             saving      = round((1 - new_size / orig_size) * 100) if orig_size else 0
+            avif_generated = avif_path is not None and avif_path.exists()
             hashes[key] = {"hash": sha256(img_path), "w": final_w, "h": final_h,
-                           **({"animated": True} if animated else {})}
+                           **({"animated": True} if animated else {}),
+                           **({"avif": True} if avif_generated else {})}
             tag = " [animated]" if animated else ""
-            print(f"  ✓  {key}{tag}  {orig_size // 1024} KB → {new_size // 1024} KB  (−{saving}%)")
+            avif_tag = " +avif" if avif_generated else ""
+            print(f"  ✓  {key}{tag}{avif_tag}  {orig_size // 1024} KB → {new_size // 1024} KB  (−{saving}%)")
             changed += 1
 
     except Exception as e:

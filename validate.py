@@ -156,7 +156,32 @@ else:
     except json.JSONDecodeError as e:
         err(f"image-dates.json is not valid JSON: {e}")
 
-# ── Summary ───────────────────────────────────────────────────────────────────
+        # alt text quality warnings
+        alt_val = img.get("alt", "")
+        if alt_val:
+            lower = alt_val.lower()
+            if lower in ("", "image", "img", "picture", "photo", "untitled",
+                         "artwork", "drawing", "painting", "sketch", "draft",
+                         "new", "final", "copy", "export"):
+                warn(f"[{cat_name}] generic alt text ('{alt_val}') — consider a more descriptive name: {file_val}")
+
+# robots.txt check
+robots_path = ROOT / "robots.txt"
+if not robots_path.exists():
+    warn("robots.txt not found — search engine crawlers may be blocked by default")
+else:
+    ok("robots.txt exists")
+
+# Extended sitemap validation (check namespace presence)
+if sitemap_path.exists():
+    try:
+        sitemap_text = sitemap_path.read_text(encoding="utf-8")
+        if "http://www.sitemaps.org/schemas/sitemap/0.9" not in sitemap_text:
+            err("sitemap.xml missing required sitemap namespace")
+        if "http://www.google.com/schemas/sitemap-image/1.1" not in sitemap_text:
+            warn("sitemap.xml missing image sitemap namespace")
+    except Exception as e:
+        err(f"Could not read sitemap.xml: {e}")
 
 print()
 for w in WARNINGS: print(w)
