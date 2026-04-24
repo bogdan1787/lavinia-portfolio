@@ -225,7 +225,7 @@ body {
   columns: 3 280px;
   column-gap: var(--gap);
   padding: var(--gap) calc(var(--gap) * 2);
-  max-width: 1800px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -557,7 +557,27 @@ body {
   }
 }
 
+/* Large screens — 4 columns, slightly wider cap */
+@media (min-width: 1600px) {
+  .gallery {
+    columns: 4 260px;
+    max-width: 1400px;
+  }
+}
+
+/* Tablet — 2 columns, tighter container */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .gallery {
+    columns: 2 300px;
+    max-width: 800px;
+  }
+}
+
+/* Mobile — 2 columns */
+@media (max-width: 767px) {
+  .gallery { columns: 2 150px; padding: var(--gap); }
+}
+
 @media (max-width: 600px) {
   :root { --hero-h: 220px; }
-  .gallery { columns: 2 160px; padding: var(--gap); }
 }
