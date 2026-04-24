@@ -59,14 +59,19 @@ themeToggle.addEventListener('click', () => {
 
 // ── Nav scroll hints ──────────────────────────────────────────────────────────
 
+let navScrollRaf = null;
 function updateNavScroll() {
-  const el      = catNavInner;
-  const atLeft  = el.scrollLeft <= 1;
-  const atRight = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
-  navScrollLeft.classList.toggle('hidden',  atLeft);
-  navScrollRight.classList.toggle('hidden', atRight);
-  catNavScroll.classList.toggle('can-scroll-left',  !atLeft);
-  catNavScroll.classList.toggle('can-scroll-right', !atRight);
+  if (navScrollRaf) return;            // already queued this frame
+  navScrollRaf = requestAnimationFrame(() => {
+    navScrollRaf = null;
+    const el      = catNavInner;
+    const atLeft  = el.scrollLeft <= 1;
+    const atRight = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+    navScrollLeft.classList.toggle('hidden',  atLeft);
+    navScrollRight.classList.toggle('hidden', atRight);
+    catNavScroll.classList.toggle('can-scroll-left',  !atLeft);
+    catNavScroll.classList.toggle('can-scroll-right', !atRight);
+  });
 }
 
 navScrollLeft.addEventListener('click',  () => catNavInner.scrollBy({ left: -150, behavior: 'smooth' }));
