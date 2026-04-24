@@ -298,7 +298,7 @@ body {
   z-index: 2;
   background: var(--accent);
   color: var(--bg);
-  font-size: .65rem;
+  font-size: .75rem;
   font-weight: 600;
   letter-spacing: .1em;
   text-transform: uppercase;

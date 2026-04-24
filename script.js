@@ -108,7 +108,7 @@ async function loadManifest() {
     const manifest = await res.json();
     return manifest.categories || [];
   } catch (err) {
-    console.error('Failed to load image manifest:', err);
+    console.warn('Failed to load image manifest:', err);
     gallery.innerHTML = (
       '<div class="empty-state"><div class="empty-inner">' +
       '<h2>Unable to load gallery</h2>' +
